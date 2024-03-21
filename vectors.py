@@ -43,11 +43,11 @@ class Vector:
     def normalize_data(self):
         '''Normalizes the data points to a range between 0 and 1.'''
         self.v = (self.v - np.min(self.v)) / (np.max(self.v) - np.min(self.v))
-
+        return self.v
     def standardize_data(self):
         '''Standardizes the data points to have mean 0 and standard deviation 1.'''
         self.v = (self.v - np.mean(self.v)) / np.std(self.v)
-
+        return self.v
     def split_data(self, test_size: float = 0.2) -> Tuple[np.array, np.array, np.array, np.array]:
         '''Splits the data into training and testing sets.'''
         if self.v is None:
