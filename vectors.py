@@ -10,20 +10,29 @@ class Vector:
 
     def __init__(self, label: int = 0, data_points: np.array = None, dates: List[str] = None):
         self.label = label
+        self.v = np.array([])  # Initialize to empty array for operations
+        self.x = np.array([])  # Dates as numerical values
+        self.y = np.array([])  # Original data points, remains static
+        self.n = 0
+
         if data_points is not None:
-            self.v = data_points
-            self.n = len(data_points)
-
-            if data_points.ndim == 2 and data_points.shape[1] > 1:
-                self.x = data_points[:, 0]
-                self.y = data_points[:, 1]
-            elif dates is not None:  # Use dates as x if y is not provided
-                self.x = np.array([(pd.to_datetime(date) - pd.to_datetime(dates[0])).days for date in dates])
-                self.y = data_points
+            data_points = np.array(data_points)
+            if dates is not None and len(dates) == len(data_points):
+                valid_pairs = [(pd.to_datetime(date), dp) for date, dp in zip(dates, data_points) if pd.notnull(date) and pd.notnull(dp)]
+                if valid_pairs:
+                    dates, data_points = zip(*valid_pairs)
+                    self.x = np.array([(date - dates[0]).days for date in dates])
+                    self.y = np.array(data_points)
+                    self.v = np.copy(self.y)  # Copy y to v for operations
+                    self.n = len(self.y)
+            elif data_points.ndim == 1:
+                self.y = data_points[~np.isnan(data_points)]
+                self.x = np.arange(len(self.y))
+                self.v = np.copy(self.y)  # Copy y to v for operations
+                self.n = len(self.y)
             else:
-                self.x = data_points
-                self.y = None
-
+                raise ValueError("Invalid data_points shape or mismatch with dates.")
+   
     def pearson_correlation(self) -> float:
         '''Calculates the Pearson correlation coefficient between x and y.'''
         if self.y is None:
@@ -41,23 +50,22 @@ class Vector:
 
     def split_data(self, test_size: float = 0.2) -> Tuple[np.array, np.array, np.array, np.array]:
         '''Splits the data into training and testing sets.'''
-        if self.y is None:
-            raise ValueError("Y data points are required for data splitting.")
+        if self.v is None:
+            raise ValueError("V data points are required for data splitting.")
         split_index = int(self.n * (1 - test_size))
-        return self.x[:split_index], self.x[split_index:], self.y[:split_index], self.y[split_index:]
+        return self.x[:split_index], self.x[split_index:], self.v[:split_index], self.v[split_index:]
 
     def save_to_file(self, filename: str):
         '''Saves the Vector instance to a file.'''
         with open(filename, 'w') as f:
             json.dump({'label': self.label, 'data_points': self.v.tolist()}, f)
 
-
     def count(self, array: np.array, value: float) -> int:
         '''Returns count of value in an array.'''
         return len(array[array == value])
 
     def linear_scale(self):
-        histo_gram = collections.Counter(self.x)
+        histo_gram = collections.Counter(self.v)
         val, cnt = zip(*histo_gram.items())
 
         n = len(cnt)
@@ -67,7 +75,7 @@ class Vector:
 
     def log_binning(self) -> Tuple[float, float]:
         """Plot the degree distribution with log binning."""
-        histo_gram = collections.Counter(self.x)
+        histo_gram = collections.Counter(self.v)
         val, cnt = zip(*histo_gram.items())
 
         n = len(cnt)
@@ -88,11 +96,8 @@ class Vector:
     def get_prob_vector(self, axis: int = 0, rounding: int = None) -> Dict[float, float]:
         '''Return probability vector for a given axis.'''
         if axis == 0:
-            vector = self.x
-        elif self.y is not None:
             vector = self.y
-        else:
-            raise ValueError("Invalid axis for probability vector.")
+    
 
         if rounding is not None:
             vector = np.round(vector, rounding)
